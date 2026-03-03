@@ -13,7 +13,7 @@ import BoostsPanel from './components/Game/BoostsPanel';
 import MultiplayerScores from './components/Game/MultiplayerScores';
 import RoundPause from './components/Game/RoundPause';
 import GameHeader from './components/Game/GameHeader';
-import { generateGameQuestions, getQuestionStats } from './utils/QuestionManager';
+import { generateGameQuestions, getQuestionStats, resetQuestionHistory } from './utils/QuestionManager';
 
 const GameContent = () => {
   const { 
@@ -53,16 +53,27 @@ const GameContent = () => {
 
   // Función para generar preguntas usando QuestionManager
   const loadQuestions = useCallback(() => {
-    const questions = generateGameQuestions(30); // Genera 30 preguntas únicas
-    setGameQuestions(questions);
-    
-    // Mostrar estadísticas en consola
-    const stats = getQuestionStats();
-    console.log(`📊 Estadísticas de preguntas:`, stats);
-    console.log(`📚 Generadas ${questions.length} preguntas únicas para esta sesión`);
-    
-    return questions;
+    try {
+      const questions = generateGameQuestions(30); // Genera 30 preguntas únicas
+      setGameQuestions(questions);
+      
+      // Mostrar estadísticas en consola
+      const stats = getQuestionStats();
+      console.log('📊 Estadísticas de preguntas:', stats);
+      console.log(`📚 Generadas ${questions.length} preguntas únicas para esta sesión`);
+      
+      return questions;
+    } catch (error) {
+      console.error('Error al cargar preguntas:', error);
+      return [];
+    }
   }, []);
+
+  // Función para resetear el historial de preguntas
+  const handleResetQuestionHistory = useCallback(() => {
+    resetQuestionHistory();
+    addToast('🔄 Historial de preguntas reseteado', 'info', 3000);
+  }, [addToast]);
 
   // Mezclar preguntas al iniciar el juego
   useEffect(() => {
