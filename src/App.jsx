@@ -48,6 +48,7 @@ const GameContent = () => {
   const [roundCorrectAnswers, setRoundCorrectAnswers] = useState(0);
   const [roundWrongAnswers, setRoundWrongAnswers] = useState(0);
   const [pauseTriggered, setPauseTriggered] = useState(false);
+  const [lastPauseRound, setLastPauseRound] = useState(0);
   
   const theme = themes[currentTheme] || themes.default;
 
@@ -78,6 +79,7 @@ const GameContent = () => {
       setRoundCorrectAnswers(0);
       setRoundWrongAnswers(0);
       setPauseTriggered(false);
+      setLastPauseRound(0);
       
       console.log(`🎮 Iniciando juego con ${questions.length} preguntas`);
     }
@@ -95,8 +97,9 @@ const GameContent = () => {
     }
   }, [showRoundPause, roundCorrectAnswers, roundWrongAnswers]);
 
-  // Verificar si es momento de pausa entre rondas
+  // Verificar si es momento de pausa entre rondas - CORREGIDO
   useEffect(() => {
+    // Solo verificar si estamos jugando, no en pausa, no terminado, y hay preguntas
     if (gameState !== 'playing' || gameFinished || showRoundPause || gameQuestions.length === 0) {
       return;
     }
@@ -107,35 +110,35 @@ const GameContent = () => {
                            currentQuestion % questionsPerRound === 0 &&
                            currentQuestion < gameQuestions.length;
 
-    if (isRoundComplete && !pauseTriggered) {
+    // Importante: Solo activar si es una ronda diferente a la última pausa
+    if (isRoundComplete && lastPauseRound !== currentRound) {
       console.log(`🏁 Ronda ${currentRound} completada en pregunta ${currentQuestion}`);
+      setLastPauseRound(currentRound);
       setPauseTriggered(true);
       setShowRoundPause(true);
       addToast(`🏁 ¡Ronda ${currentRound} completada!`, 'info', 3000);
       playSound('levelup');
     }
-  }, [currentQuestion, gameState, gameFinished, showRoundPause, gameQuestions.length, currentRound, questionsPerRound, pauseTriggered, playSound, addToast]);
+  }, [currentQuestion, gameState, gameFinished, showRoundPause, gameQuestions.length, currentRound, questionsPerRound, lastPauseRound, playSound, addToast]);
 
   // Manejar continuación después de la pausa - CORREGIDO
   const handleContinueAfterPause = useCallback(() => {
-    // La pregunta actual es el múltiplo (10, 20, etc.)
-    // Necesitamos avanzar a la siguiente pregunta manualmente
-    const nextQuestionIndex = currentQuestion; // Mantener el mismo índice por ahora
+    // Calcular la siguiente pregunta (actual + 1)
+    const nextQuestionIndex = currentQuestion + 1;
     
-    console.log(`▶️ Continuando desde pregunta ${nextQuestionIndex} a ronda ${currentRound + 1}`);
+    console.log(`▶️ Continuando a ronda ${currentRound + 1}, siguiente pregunta: ${nextQuestionIndex}`);
     
     // Incrementar la ronda
     setCurrentRound(prev => prev + 1);
+    
+    // Avanzar a la siguiente pregunta
+    setCurrentQuestion(nextQuestionIndex);
     
     // Resetear estados de pausa
     setShowRoundPause(false);
     setPauseTriggered(false);
     setRoundCorrectAnswers(0);
     setRoundWrongAnswers(0);
-    
-    // IMPORTANTE: No cambiar currentQuestion aquí, 
-    // ya está en el valor correcto (10, 20, etc.)
-    // La siguiente pregunta se cargará naturalmente
     
     playSound('click');
   }, [currentQuestion, playSound]);
