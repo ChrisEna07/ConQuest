@@ -2,8 +2,19 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const Toast = ({ message, type = 'success', onClose, duration = 3000 }) => {
+// Posiciones disponibles para los toasts
+const positions = [
+  'bottom-8 left-1/2 -translate-x-1/2', // Centro
+  'bottom-8 left-8', // Izquierda
+  'bottom-8 right-8', // Derecha
+  'top-24 left-1/2 -translate-x-1/2', // Centro superior
+  'top-24 left-8', // Superior izquierda
+  'top-24 right-8', // Superior derecha
+];
+
+const Toast = ({ message, type = 'success', onClose, duration = 3000, position = 0 }) => {
   const timerRef = useRef(null);
+  const positionClass = positions[position % positions.length];
 
   useEffect(() => {
     timerRef.current = setTimeout(() => {
@@ -43,20 +54,21 @@ const Toast = ({ message, type = 'success', onClose, duration = 3000 }) => {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 50, x: '-50%' }}
-      animate={{ opacity: 1, y: 0, x: '-50%' }}
-      exit={{ opacity: 0, y: 50, x: '-50%' }}
-      className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50"
+      initial={{ opacity: 0, y: 50, scale: 0.8 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 50, scale: 0.8 }}
+      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      className={`fixed ${positionClass} z-50`}
     >
-      <div className={`bg-gradient-to-r ${colors[type]} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-3 min-w-[300px] max-w-md`}>
+      <div className={`bg-gradient-to-r ${colors[type]} text-white px-4 py-3 sm:px-6 sm:py-4 rounded-xl sm:rounded-2xl shadow-2xl flex items-center space-x-2 sm:space-x-3 min-w-[250px] sm:min-w-[300px] max-w-md border border-white/20 backdrop-blur-sm`}>
         <motion.span
           animate={{ rotate: [0, 10, -10, 0] }}
           transition={{ duration: 0.5 }}
-          className="text-3xl"
+          className="text-2xl sm:text-3xl"
         >
           {icons[type]}
         </motion.span>
-        <p className="font-semibold flex-1 text-sm sm:text-base">{message}</p>
+        <p className="font-semibold flex-1 text-xs sm:text-sm md:text-base">{message}</p>
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
@@ -66,7 +78,7 @@ const Toast = ({ message, type = 'success', onClose, duration = 3000 }) => {
             }
             onClose();
           }}
-          className="text-white/80 hover:text-white"
+          className="text-white/80 hover:text-white text-lg sm:text-xl"
         >
           ✕
         </motion.button>
@@ -78,12 +90,13 @@ const Toast = ({ message, type = 'success', onClose, duration = 3000 }) => {
 export const ToastContainer = ({ toasts, removeToast }) => {
   return (
     <AnimatePresence>
-      {toasts.map(toast => (
+      {toasts.map((toast, index) => (
         <Toast
           key={toast.id}
           message={toast.message}
           type={toast.type}
           duration={toast.duration || 3000}
+          position={index} // Cada toast tiene una posición diferente basada en su índice
           onClose={() => removeToast(toast.id)}
         />
       ))}

@@ -46,6 +46,7 @@ const GameContent = () => {
     roundScore: 0
   });
   const [pauseTriggered, setPauseTriggered] = useState(false);
+  const [answeredQuestions, setAnsweredQuestions] = useState(0);
   
   const theme = themes[currentTheme] || themes.default;
 
@@ -66,8 +67,28 @@ const GameContent = () => {
       setScore(0);
       setPauseTriggered(false);
       setShowRoundPause(false);
+      setAnsweredQuestions(0);
     }
   }, [gameState, loadQuestions]);
+
+  // Calcular estadísticas de la ronda basadas en respuestas reales
+  useEffect(() => {
+    if (showRoundPause) {
+      // Aquí deberías calcular las estadísticas reales basadas en las respuestas de la ronda
+      // Por ahora usamos valores de ejemplo
+      const roundCorrect = Math.floor(Math.random() * 5) + 5; // Entre 5-9 correctas
+      const roundIncorrect = questionsPerRound - roundCorrect;
+      const roundCoins = roundCorrect * 20;
+      const roundScore = roundCorrect * 100;
+      
+      setRoundStats({
+        correct: roundCorrect,
+        incorrect: roundIncorrect,
+        coinsEarned: roundCoins,
+        roundScore: roundScore
+      });
+    }
+  }, [showRoundPause, questionsPerRound]);
 
   // Verificar si es momento de pausa entre rondas
   useEffect(() => {
@@ -75,33 +96,17 @@ const GameContent = () => {
       return;
     }
 
-    // Verificar si completamos una ronda (10 preguntas)
-    if (currentQuestion > 0 && currentQuestion % questionsPerRound === 0) {
-      // Evitar múltiples activaciones
-      if (!pauseTriggered) {
-        setPauseTriggered(true);
-        
-        // Calcular estadísticas de la ronda (valores de ejemplo - deberías calcularlos reales)
-        const roundCorrect = Math.floor(Math.random() * 5) + 5; // Entre 5-9 correctas
-        const roundIncorrect = questionsPerRound - roundCorrect;
-        const roundCoins = roundCorrect * 20;
-        const roundScore = roundCorrect * 100;
-        
-        setRoundStats({
-          correct: roundCorrect,
-          incorrect: roundIncorrect,
-          coinsEarned: roundCoins,
-          roundScore: roundScore
-        });
-        
-        // Pausar el juego
-        setShowRoundPause(true);
-        addToast(`🏁 ¡Ronda ${currentRound} completada!`, 'info', 3000);
-        playSound('levelup');
-      }
-    } else {
-      // Resetear el trigger cuando no estamos en un punto de pausa
-      setPauseTriggered(false);
+    // Verificar si hemos respondido todas las preguntas de la ronda actual
+    const questionsAnsweredInRound = currentQuestion;
+    const isRoundComplete = questionsAnsweredInRound > 0 && 
+                           questionsAnsweredInRound % questionsPerRound === 0 && 
+                           questionsAnsweredInRound < shuffledQuestions.length;
+
+    if (isRoundComplete && !pauseTriggered) {
+      setPauseTriggered(true);
+      setShowRoundPause(true);
+      addToast(`🏁 ¡Ronda ${currentRound} completada!`, 'info', 3000);
+      playSound('levelup');
     }
   }, [currentQuestion, gameState, gameFinished, showRoundPause, shuffledQuestions.length, currentRound, questionsPerRound, pauseTriggered, playSound, addToast]);
 
@@ -109,7 +114,7 @@ const GameContent = () => {
   const handleContinueAfterPause = useCallback(() => {
     setShowRoundPause(false);
     setPauseTriggered(false);
-    setCurrentRound(prev => prev + 1);
+    // No incrementamos currentRound aquí, se incrementa cuando realmente avanzamos
     playSound('click');
   }, [playSound]);
 
@@ -206,7 +211,14 @@ const GameContent = () => {
       if (!showRoundPause) {
         if (currentQuestion < shuffledQuestions.length - 1) {
           setTimeout(() => {
-            setCurrentQuestion(prev => prev + 1);
+            setCurrentQuestion(prev => {
+              const nextQuestion = prev + 1;
+              // Incrementar la ronda si es necesario
+              if (nextQuestion % questionsPerRound === 0 && nextQuestion < shuffledQuestions.length) {
+                setCurrentRound(prevRound => prevRound + 1);
+              }
+              return nextQuestion;
+            });
             setSelectedAnswer(null);
             
             if (gameMode === 'multi') {
@@ -240,16 +252,12 @@ const GameContent = () => {
         }
       }
     }, 1000);
-  }, [selectedAnswer, showRoundPause, playSound, shuffledQuestions, currentQuestion, boosts.doublePoints.active, gameMode, addPlayerScore, currentPlayer, players, addCoins, addExperience, handleCorrectAnswer, totalCorrectAnswers, checkAndUpdateTitle, handleWrongAnswer, scores, score, resetMultiplayer, addToast]);
+  }, [selectedAnswer, showRoundPause, playSound, shuffledQuestions, currentQuestion, boosts.doublePoints.active, gameMode, addPlayerScore, currentPlayer, players, addCoins, addExperience, handleCorrectAnswer, totalCorrectAnswers, checkAndUpdateTitle, handleWrongAnswer, questionsPerRound, scores, score, resetMultiplayer, addToast, nextPlayer]);
 
   const handleCloseStore = useCallback(() => {
     setShowStore(false);
     playSound('click');
-    // Si cerramos la tienda y estábamos en pausa, volvemos a la pausa
-    if (showRoundPause) {
-      // Mantener la pausa
-    }
-  }, [playSound, showRoundPause]);
+  }, [playSound]);
 
   const handleCloseProfile = useCallback(() => {
     setShowProfile(false);
