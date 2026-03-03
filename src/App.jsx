@@ -13,7 +13,7 @@ import BoostsPanel from './components/Game/BoostsPanel';
 import MultiplayerScores from './components/Game/MultiplayerScores';
 import RoundPause from './components/Game/RoundPause';
 import GameHeader from './components/Game/GameHeader';
-import { getRandomQuestions } from './data/questions';
+import { generateGameQuestions, getQuestionStats } from './utils/QuestionManager';
 
 const GameContent = () => {
   const { 
@@ -26,7 +26,7 @@ const GameContent = () => {
   } = useGame();
   
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [shuffledQuestions, setShuffledQuestions] = useState([]);
+  const [gameQuestions, setGameQuestions] = useState([]);
   const [showStore, setShowStore] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
@@ -45,77 +45,84 @@ const GameContent = () => {
     coinsEarned: 0,
     roundScore: 0
   });
-  const [pauseTriggered, setPauseTriggered] = useState(false);
   const [roundCorrectAnswers, setRoundCorrectAnswers] = useState(0);
   const [roundWrongAnswers, setRoundWrongAnswers] = useState(0);
+  const [nextRoundReady, setNextRoundReady] = useState(false);
   
   const theme = themes[currentTheme] || themes.default;
 
-  // Función para mezclar preguntas
+  // Función para generar preguntas usando QuestionManager
   const loadQuestions = useCallback(() => {
-    const questions = getRandomQuestions(30);
-    setShuffledQuestions(questions);
-    console.log(`📚 Cargadas ${questions.length} preguntas`);
+    const questions = generateGameQuestions(30); // Genera 30 preguntas únicas
+    setGameQuestions(questions);
+    
+    // Mostrar estadísticas en consola
+    const stats = getQuestionStats();
+    console.log(`📊 Estadísticas de preguntas:`, stats);
+    console.log(`📚 Generadas ${questions.length} preguntas únicas para esta sesión`);
+    
+    return questions;
   }, []);
 
   // Mezclar preguntas al iniciar el juego
   useEffect(() => {
     if (gameState === 'playing') {
-      loadQuestions();
+      const questions = loadQuestions();
       setCurrentRound(1);
       setCurrentQuestion(0);
       setTotalCorrectAnswers(0);
       setScore(0);
-      setPauseTriggered(false);
       setShowRoundPause(false);
       setRoundCorrectAnswers(0);
       setRoundWrongAnswers(0);
+      setNextRoundReady(false);
+      
+      console.log(`🎮 Iniciando juego con ${questions.length} preguntas`);
     }
   }, [gameState, loadQuestions]);
 
   // Calcular estadísticas de la ronda
-  const calculateRoundStats = useCallback(() => {
-    setRoundStats({
-      correct: roundCorrectAnswers,
-      incorrect: roundWrongAnswers,
-      coinsEarned: roundCorrectAnswers * 20,
-      roundScore: roundCorrectAnswers * 100
-    });
-  }, [roundCorrectAnswers, roundWrongAnswers]);
+  useEffect(() => {
+    if (showRoundPause) {
+      setRoundStats({
+        correct: roundCorrectAnswers,
+        incorrect: roundWrongAnswers,
+        coinsEarned: roundCorrectAnswers * 20,
+        roundScore: roundCorrectAnswers * 100
+      });
+    }
+  }, [showRoundPause, roundCorrectAnswers, roundWrongAnswers]);
 
   // Verificar si es momento de pausa entre rondas
   useEffect(() => {
-    // Solo verificar si estamos jugando, no en pausa, no terminado, y hay preguntas
-    if (gameState !== 'playing' || gameFinished || showRoundPause || shuffledQuestions.length === 0) {
+    if (gameState !== 'playing' || gameFinished || showRoundPause || gameQuestions.length === 0) {
       return;
     }
 
-    // Verificar si hemos completado una ronda (10 preguntas) y no es la última pregunta
     const isRoundComplete = currentQuestion > 0 && 
-                           currentQuestion % questionsPerRound === 0 && 
-                           currentQuestion < shuffledQuestions.length;
+                           currentQuestion % questionsPerRound === 0;
 
-    if (isRoundComplete && !pauseTriggered) {
+    if (isRoundComplete && !nextRoundReady) {
       console.log(`🏁 Ronda ${currentRound} completada en pregunta ${currentQuestion}`);
-      setPauseTriggered(true);
-      calculateRoundStats();
+      setNextRoundReady(true);
       setShowRoundPause(true);
       addToast(`🏁 ¡Ronda ${currentRound} completada!`, 'info', 3000);
       playSound('levelup');
     }
-  }, [currentQuestion, gameState, gameFinished, showRoundPause, shuffledQuestions.length, currentRound, questionsPerRound, pauseTriggered, calculateRoundStats, playSound, addToast]);
+  }, [currentQuestion, gameState, gameFinished, showRoundPause, gameQuestions.length, currentRound, questionsPerRound, nextRoundReady, playSound, addToast]);
 
   // Manejar continuación después de la pausa
   const handleContinueAfterPause = useCallback(() => {
-    console.log(`▶️ Continuando a la siguiente ronda desde ronda ${currentRound}`);
+    console.log(`▶️ Continuando a ronda ${currentRound + 1}`);
+    
+    setCurrentRound(prev => prev + 1);
     setShowRoundPause(false);
-    setPauseTriggered(false);
+    setNextRoundReady(false);
     setRoundCorrectAnswers(0);
     setRoundWrongAnswers(0);
+    
     playSound('click');
-    // Importante: NO incrementamos currentRound aquí, se incrementará naturalmente
-    // cuando se respondan las preguntas de la siguiente ronda
-  }, [playSound, currentRound]);
+  }, [playSound]);
 
   // Ir a la tienda desde la pausa
   const handleGoToStore = useCallback(() => {
@@ -172,8 +179,8 @@ const GameContent = () => {
     playSound('click');
     
     setTimeout(() => {
-      const isCorrect = index === shuffledQuestions[currentQuestion]?.correct;
-      const currentReward = shuffledQuestions[currentQuestion]?.reward || 15;
+      const isCorrect = index === gameQuestions[currentQuestion]?.correct;
+      const currentReward = gameQuestions[currentQuestion]?.reward || 15;
       let reward = currentReward;
       
       if (isCorrect) {
@@ -190,13 +197,11 @@ const GameContent = () => {
           addExperience(10);
         }
         
-        // Actualizar sistema de títulos y rachas
         handleCorrectAnswer();
         const newTotalCorrect = totalCorrectAnswers + 1;
         setTotalCorrectAnswers(newTotalCorrect);
         checkAndUpdateTitle(newTotalCorrect);
         
-        // Actualizar contadores de la ronda
         setRoundCorrectAnswers(prev => prev + 1);
         
         playSound('correct');
@@ -204,7 +209,6 @@ const GameContent = () => {
         handleWrongAnswer();
         playSound('wrong');
         
-        // Actualizar contadores de la ronda
         setRoundWrongAnswers(prev => prev + 1);
         
         if (gameMode === 'multi') {
@@ -212,24 +216,9 @@ const GameContent = () => {
         }
       }
       
-      // Avanzar a la siguiente pregunta
-      if (currentQuestion < shuffledQuestions.length - 1) {
+      if (currentQuestion < gameQuestions.length - 1) {
         setTimeout(() => {
-          const nextQuestion = currentQuestion + 1;
-          
-          // Verificar si vamos a empezar una nueva ronda
-          const isNewRound = nextQuestion % questionsPerRound === 0;
-          
-          setCurrentQuestion(nextQuestion);
-          
-          // Solo incrementamos la ronda si es una nueva ronda Y no es la última pregunta
-          if (isNewRound && nextQuestion < shuffledQuestions.length) {
-            setCurrentRound(prev => {
-              console.log(`🔄 Incrementando ronda de ${prev} a ${prev + 1}`);
-              return prev + 1;
-            });
-          }
-          
+          setCurrentQuestion(prev => prev + 1);
           setSelectedAnswer(null);
           
           if (gameMode === 'multi') {
@@ -237,7 +226,6 @@ const GameContent = () => {
           }
         }, 1500);
       } else {
-        // Fin del juego
         setGameFinished(true);
         
         setTimeout(() => {
@@ -262,12 +250,15 @@ const GameContent = () => {
         }, 2000);
       }
     }, 1000);
-  }, [selectedAnswer, showRoundPause, playSound, shuffledQuestions, currentQuestion, boosts.doublePoints.active, gameMode, addPlayerScore, currentPlayer, players, addCoins, addExperience, handleCorrectAnswer, totalCorrectAnswers, checkAndUpdateTitle, handleWrongAnswer, questionsPerRound, scores, score, resetMultiplayer, addToast, nextPlayer]);
+  }, [selectedAnswer, showRoundPause, playSound, gameQuestions, currentQuestion, boosts.doublePoints.active, gameMode, addPlayerScore, currentPlayer, players, addCoins, addExperience, handleCorrectAnswer, totalCorrectAnswers, checkAndUpdateTitle, handleWrongAnswer, scores, score, resetMultiplayer, addToast, nextPlayer]);
 
   const handleCloseStore = useCallback(() => {
     setShowStore(false);
     playSound('click');
-  }, [playSound]);
+    if (nextRoundReady) {
+      setShowRoundPause(true);
+    }
+  }, [playSound, nextRoundReady]);
 
   const handleCloseProfile = useCallback(() => {
     setShowProfile(false);
@@ -283,7 +274,7 @@ const GameContent = () => {
     return <PlayerSelector onSelect={handlePlayerSelect} onBack={handleBackToLanding} />;
   }
 
-  if (!shuffledQuestions.length) {
+  if (!gameQuestions.length) {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-indigo-900 to-purple-900 flex items-center justify-center">
         <div className="text-white text-2xl animate-pulse">Cargando preguntas...</div>
@@ -293,14 +284,13 @@ const GameContent = () => {
 
   return (
     <div className={`fixed inset-0 flex flex-col bg-gradient-to-br ${theme.bg} transition-all duration-500`}>
-      {/* Header */}
       <GameHeader 
         theme={theme}
         userName={userName}
         coins={coins}
         gameMode={gameMode}
         currentRound={currentRound}
-        totalQuestions={shuffledQuestions.length}
+        totalQuestions={gameQuestions.length}
         currentQuestion={currentQuestion}
         correctStreak={correctStreak}
         currentTitle={currentTitle}
@@ -315,15 +305,12 @@ const GameContent = () => {
         playSound={playSound}
       />
 
-      {/* Boosts activos */}
       <ActiveBoosts />
 
-      {/* Panel de boosts */}
       {!showStore && !showProfile && !gameFinished && !showRoundPause && (
         <BoostsPanel onUseBoost={handleUseBoost} />
       )}
 
-      {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-3 sm:py-4 overflow-y-auto">
         {gameMode === 'multi' && <MultiplayerScores />}
         
@@ -352,7 +339,7 @@ const GameContent = () => {
               <div className="w-full bg-white/5 backdrop-blur-lg rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 border border-white/10">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-white/60 text-sm sm:text-base">
-                    Pregunta {currentQuestion + 1}/{shuffledQuestions.length}
+                    Pregunta {currentQuestion + 1}/{gameQuestions.length}
                   </span>
                   {gameMode === 'single' && (
                     <div className="flex items-center gap-2">
@@ -367,7 +354,7 @@ const GameContent = () => {
                 </div>
                 
                 <Question 
-                  question={shuffledQuestions[currentQuestion]}
+                  question={gameQuestions[currentQuestion]}
                   selectedAnswer={selectedAnswer}
                   onAnswer={handleAnswer}
                   theme={theme}
