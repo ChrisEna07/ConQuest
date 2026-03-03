@@ -1,0 +1,491 @@
+/* src/App.css */
+
+/* Reset y estilos base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --success-gradient: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+  --warning-gradient: linear-gradient(135deg, #fad961 0%, #f76b1c 100%);
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.2);
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Estilos para la landing page */
+.landing-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-gradient);
+  position: relative;
+  overflow: hidden;
+}
+
+.landing-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  animation: backgroundScroll 20s linear infinite;
+}
+
+/* Estilos para el juego */
+.game-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+/* Header del juego */
+.game-header {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* Contenedor de preguntas */
+.question-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Estilos para tarjetas */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Botones */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  outline: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+.btn-primary {
+  background: var(--primary-gradient);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+  background: var(--secondary-gradient);
+  color: white;
+  box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);
+}
+
+.btn-success {
+  background: var(--success-gradient);
+  color: white;
+  box-shadow: 0 4px 15px rgba(132, 250, 176, 0.4);
+}
+
+.btn-warning {
+  background: var(--warning-gradient);
+  color: white;
+  box-shadow: 0 4px 15px rgba(250, 217, 97, 0.4);
+}
+
+/* Opciones de respuesta */
+.option-btn {
+  width: 100%;
+  padding: 1.25rem;
+  margin: 0.5rem 0;
+  border: 2px solid transparent;
+  border-radius: 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.option-btn:not(:disabled) {
+  background: var(--glass-bg);
+  backdrop-filter: blur(5px);
+  color: white;
+}
+
+.option-btn:not(:disabled):hover {
+  transform: scale(1.02);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+}
+
+.option-btn.correct {
+  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+  border-color: #fff;
+  animation: correctPulse 0.5s ease;
+}
+
+.option-btn.incorrect {
+  background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+  border-color: #fff;
+  animation: incorrectShake 0.5s ease;
+}
+
+/* Timer */
+.timer-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.timer-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--glass-bg);
+  backdrop-filter: blur(5px);
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.timer-circle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: conic-gradient(#4caf50 0deg, #ffc107 180deg, #f44336 360deg);
+  animation: timerProgress 30s linear infinite;
+}
+
+.timer-text {
+  position: relative;
+  z-index: 1;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.timer-warning {
+  animation: timerPulse 1s ease-in-out infinite;
+}
+
+/* Animaciones */
+@keyframes backgroundScroll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-60px);
+  }
+}
+
+@keyframes correctPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px #4caf50;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes incorrectShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(10px);
+  }
+}
+
+@keyframes timerProgress {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes timerPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Utilidades de animación */
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin 8s linear infinite;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.5s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
+
+/* Media queries para responsividad */
+@media (max-width: 768px) {
+  .game-header {
+    padding: 0.75rem;
+  }
+
+  .question-container {
+    padding: 1rem;
+  }
+
+  .glass-card {
+    padding: 1.5rem;
+  }
+
+  .option-btn {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+
+  .timer-circle {
+    width: 60px;
+    height: 60px;
+  }
+
+  .timer-text {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .game-header {
+    padding: 0.5rem;
+  }
+
+  .glass-card {
+    padding: 1rem;
+  }
+
+  .option-btn {
+    padding: 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Soporte para modo oscuro */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-bg: rgba(0, 0, 0, 0.2);
+    --glass-border: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Soporte para reducción de movimiento */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Estilos para el logo (manteniendo compatibilidad) */
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+/* Animación del logo (manteniendo compatibilidad) */
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+/* Estilos para tarjetas (manteniendo compatibilidad) */
+.card {
+  padding: 2em;
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+}
+
+/* Estilos para documentación (manteniendo compatibilidad) */
+.read-the-docs {
+  color: #888;
+}
