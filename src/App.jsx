@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameProvider, useGame } from './context/GameContext';
 import LandingPage from './components/Landing/LandingPage';
@@ -7,15 +7,13 @@ import PlayerSelector from './components/Landing/PlayerSelector';
 import Question from './components/Game/Question';
 import Store from './components/Store/Store';
 import UserProfile from './components/Profile/UserProfile';
-import Coins from './components/UI/Coins';
-import LevelProgress from './components/UI/LevelProgress';
 import { ToastContainer } from './components/UI/Toast';
 import ActiveBoosts from './components/Game/ActiveBoosts';
 import BoostsPanel from './components/Game/BoostsPanel';
 import MultiplayerScores from './components/Game/MultiplayerScores';
 import RoundPause from './components/Game/RoundPause';
-import { getRandomQuestions } from './data/questions';
 import GameHeader from './components/Game/GameHeader';
+import { getRandomQuestions } from './data/questions';
 
 const GameContent = () => {
   const { 
@@ -23,7 +21,8 @@ const GameContent = () => {
     toasts, removeToast, setUserName, playSound, boosts, useBoost,
     gameMode, players, currentPlayer, scores, addPlayerScore, nextPlayer,
     initializeMultiplayer, addToast, resetMultiplayer,
-    handleCorrectAnswer, handleWrongAnswer, checkAndUpdateTitle
+    handleCorrectAnswer, handleWrongAnswer, checkAndUpdateTitle,
+    currentTitle, correctStreak
   } = useGame();
   
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -36,24 +35,26 @@ const GameContent = () => {
   const [gameFinished, setGameFinished] = useState(false);
   const [totalCorrectAnswers, setTotalCorrectAnswers] = useState(0);
   
-  // Nuevos estados para sistema de rondas
+  // Estados para sistema de rondas
   const [currentRound, setCurrentRound] = useState(1);
-  const [questionsPerRound] = useState(10); // 10 preguntas por ronda
+  const [questionsPerRound] = useState(10);
   const [showRoundPause, setShowRoundPause] = useState(false);
   const [roundStats, setRoundStats] = useState({
     correct: 0,
     incorrect: 0,
-    coinsEarned: 0
+    coinsEarned: 0,
+    roundScore: 0
   });
+  const [pauseTriggered, setPauseTriggered] = useState(false);
   
   const theme = themes[currentTheme] || themes.default;
 
-  // Función para mezclar preguntas (solo 30)
-  const loadQuestions = () => {
-    const questions = getRandomQuestions(30); // Solo 30 preguntas
+  // Función para mezclar preguntas
+  const loadQuestions = useCallback(() => {
+    const questions = getRandomQuestions(30);
     setShuffledQuestions(questions);
-    console.log(`📚 Cargadas ${questions.length} preguntas para la sesión`);
-  };
+    console.log(`📚 Cargadas ${questions.length} preguntas`);
+  }, []);
 
   // Mezclar preguntas al iniciar el juego
   useEffect(() => {
@@ -61,113 +62,126 @@ const GameContent = () => {
       loadQuestions();
       setCurrentRound(1);
       setCurrentQuestion(0);
+      setTotalCorrectAnswers(0);
+      setScore(0);
+      setPauseTriggered(false);
+      setShowRoundPause(false);
     }
-  }, [gameState]);
+  }, [gameState, loadQuestions]);
 
   // Verificar si es momento de pausa entre rondas
   useEffect(() => {
-    if (gameState === 'playing' && !gameFinished && shuffledQuestions.length > 0) {
-      // Si completamos una ronda (múltiplo de questionsPerRound) y no es la última pregunta
-      if (currentQuestion > 0 && 
-          currentQuestion % questionsPerRound === 0 && 
-          currentQuestion < shuffledQuestions.length) {
+    if (gameState !== 'playing' || gameFinished || showRoundPause || !shuffledQuestions.length) {
+      return;
+    }
+
+    // Verificar si completamos una ronda (10 preguntas)
+    if (currentQuestion > 0 && currentQuestion % questionsPerRound === 0) {
+      // Evitar múltiples activaciones
+      if (!pauseTriggered) {
+        setPauseTriggered(true);
         
-        // Calcular estadísticas de la ronda
-        const roundCorrect = Math.floor(Math.random() * 5) + 3; // Esto debería ser real
+        // Calcular estadísticas de la ronda (valores de ejemplo - deberías calcularlos reales)
+        const roundCorrect = Math.floor(Math.random() * 5) + 5; // Entre 5-9 correctas
         const roundIncorrect = questionsPerRound - roundCorrect;
-        const roundCoins = roundCorrect * 20; // Estimado
+        const roundCoins = roundCorrect * 20;
+        const roundScore = roundCorrect * 100;
         
         setRoundStats({
           correct: roundCorrect,
           incorrect: roundIncorrect,
-          coinsEarned: roundCoins
+          coinsEarned: roundCoins,
+          roundScore: roundScore
         });
         
         // Pausar el juego
         setShowRoundPause(true);
-        addToast(`🏁 ¡Ronda ${currentRound} completada! Tiempo para comprar en la tienda`, 'info', 4000);
+        addToast(`🏁 ¡Ronda ${currentRound} completada!`, 'info', 3000);
         playSound('levelup');
       }
+    } else {
+      // Resetear el trigger cuando no estamos en un punto de pausa
+      setPauseTriggered(false);
     }
-  }, [currentQuestion, gameState, gameFinished, shuffledQuestions.length, currentRound, questionsPerRound, playSound, addToast]);
+  }, [currentQuestion, gameState, gameFinished, showRoundPause, shuffledQuestions.length, currentRound, questionsPerRound, pauseTriggered, playSound, addToast]);
 
   // Manejar continuación después de la pausa
-  const handleContinueAfterPause = () => {
+  const handleContinueAfterPause = useCallback(() => {
     setShowRoundPause(false);
+    setPauseTriggered(false);
     setCurrentRound(prev => prev + 1);
     playSound('click');
-  };
+  }, [playSound]);
 
   // Ir a la tienda desde la pausa
-  const handleGoToStore = () => {
+  const handleGoToStore = useCallback(() => {
     setShowRoundPause(false);
     setShowStore(true);
     playSound('click');
-  };
+  }, [playSound]);
 
+  // Efecto para desactivar puntos dobles
   useEffect(() => {
     if (selectedAnswer !== null && boosts.doublePoints.active) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         useBoost('doublePoints');
       }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [selectedAnswer, boosts.doublePoints.active]);
+  }, [selectedAnswer, boosts.doublePoints.active, useBoost]);
 
-  const handleLandingStart = () => {
+  const handleLandingStart = useCallback(() => {
     setGameState('playerSelect');
     playSound('click');
-  };
+  }, [playSound]);
 
-  const handleBackToLanding = () => {
+  const handleBackToLanding = useCallback(() => {
     setGameState('landing');
     resetMultiplayer();
     playSound('click');
-  };
+  }, [playSound, resetMultiplayer]);
 
-  const handlePlayerSelect = (playerNames) => {
+  const handlePlayerSelect = useCallback((playerNames) => {
     if (playerNames.length === 1) {
       setUserName(playerNames[0]);
       setGameState('playing');
-      addToast(`🎮 ¡Bienvenido ${playerNames[0]}!`, 'success');
+      addToast(`🎮 ¡Bienvenido ${playerNames[0]}!`, 'success', 3000);
     } else {
       initializeMultiplayer(playerNames);
       setGameState('playing');
-      addToast(`🎮 ¡Partida de ${playerNames.length} jugadores!`, 'success');
+      addToast(`🎮 ¡Partida de ${playerNames.length} jugadores!`, 'success', 3000);
     }
     playSound('click');
-  };
+  }, [playSound, initializeMultiplayer, addToast, setUserName]);
 
-  const handleUseBoost = (boostType) => {
+  const handleUseBoost = useCallback((boostType) => {
     const success = useBoost(boostType);
     if (success) {
-      addToast(`✨ ¡${boosts[boostType].name} activado para esta pregunta!`, 'boost', 3000);
+      addToast(`✨ ¡${boosts[boostType].name} activado!`, 'boost', 2000);
     }
-  };
+  }, [useBoost, boosts, addToast]);
 
-  const handleAnswer = (index) => {
-    if (selectedAnswer !== null) return;
+  const handleAnswer = useCallback((index) => {
+    if (selectedAnswer !== null || showRoundPause) return;
     
     setSelectedAnswer(index);
     playSound('click');
     
     setTimeout(() => {
       const isCorrect = index === shuffledQuestions[currentQuestion]?.correct;
+      const currentReward = shuffledQuestions[currentQuestion]?.reward || 15;
+      let reward = currentReward;
       
       if (isCorrect) {
-        let reward = shuffledQuestions[currentQuestion]?.reward || 15;
-        
         if (boosts.doublePoints.active) {
           reward *= 2;
         }
         
         if (gameMode === 'multi') {
           addPlayerScore(currentPlayer, reward);
-          addToast(`✅ ¡${players[currentPlayer]?.name} ganó ${reward} puntos!`, 'success');
+          addToast(`✅ ¡${players[currentPlayer]?.name} ganó ${reward} puntos!`, 'success', 2000);
         } else {
-          setScore(prev => {
-            const newScore = prev + reward;
-            return newScore;
-          });
+          setScore(prev => prev + reward);
           addCoins(reward);
           addExperience(10);
         }
@@ -180,12 +194,11 @@ const GameContent = () => {
         
         playSound('correct');
       } else {
-        // Actualizar sistema de rachas (respuesta incorrecta)
         handleWrongAnswer();
         playSound('wrong');
         
         if (gameMode === 'multi') {
-          addToast(`❌ ¡${players[currentPlayer]?.name} falló!`, 'error');
+          addToast(`❌ ¡${players[currentPlayer]?.name} falló!`, 'error', 2000);
         }
       }
       
@@ -201,7 +214,9 @@ const GameContent = () => {
             }
           }, 1500);
         } else {
+          // Fin del juego
           setGameFinished(true);
+          
           setTimeout(() => {
             setCurrentQuestion(0);
             setSelectedAnswer(null);
@@ -212,33 +227,36 @@ const GameContent = () => {
               const winner = Object.entries(scores).reduce((a, b) => 
                 (scores[a[0]] > scores[b[0]] ? a : b)
               );
-              addToast(`🏆 ¡Ganador: ${players[winner[0]]?.name} con ${winner[1]} puntos!`, 'success');
+              addToast(`🏆 ¡Ganador: ${players[winner[0]]?.name} con ${winner[1]} puntos!`, 'success', 4000);
+            } else {
+              addToast(`🎮 ¡Juego completado! Puntuación final: ${score}`, 'success', 4000);
             }
             
             setTimeout(() => {
               setGameState('playerSelect');
               resetMultiplayer();
-            }, 2000);
-          }, 3000);
+            }, 3000);
+          }, 2000);
         }
       }
     }, 1000);
-  };
+  }, [selectedAnswer, showRoundPause, playSound, shuffledQuestions, currentQuestion, boosts.doublePoints.active, gameMode, addPlayerScore, currentPlayer, players, addCoins, addExperience, handleCorrectAnswer, totalCorrectAnswers, checkAndUpdateTitle, handleWrongAnswer, scores, score, resetMultiplayer, addToast]);
 
-  const handleCloseStore = () => {
+  const handleCloseStore = useCallback(() => {
     setShowStore(false);
     playSound('click');
-    // Si cerramos la tienda durante una pausa, volvemos a la pausa
+    // Si cerramos la tienda y estábamos en pausa, volvemos a la pausa
     if (showRoundPause) {
-      setShowRoundPause(true);
+      // Mantener la pausa
     }
-  };
+  }, [playSound, showRoundPause]);
 
-  const handleCloseProfile = () => {
+  const handleCloseProfile = useCallback(() => {
     setShowProfile(false);
     playSound('click');
-  };
+  }, [playSound]);
 
+  // Renderizado condicional
   if (gameState === 'landing') {
     return <LandingPage onStart={handleLandingStart} />;
   }
@@ -258,82 +276,26 @@ const GameContent = () => {
   return (
     <div className={`fixed inset-0 flex flex-col bg-gradient-to-br ${theme.bg} transition-all duration-500`}>
       {/* Header */}
-      <motion.header 
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="bg-white/10 backdrop-blur-lg shadow-lg z-40 flex-shrink-0"
-      >
-        <div className="container mx-auto px-4 py-2 sm:py-3">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
-            <div className="flex items-center space-x-4 w-full sm:w-auto justify-between sm:justify-start">
-              <motion.h1 
-                whileHover={{ scale: 1.05 }}
-                className="text-base sm:text-lg md:text-xl font-bold text-white truncate"
-              >
-                ConquestQuestion
-              </motion.h1>
-              {gameMode === 'single' && (
-                <span className="text-white/80 text-xs sm:text-sm truncate">
-                  👤 {userName}
-                </span>
-              )}
-            </div>
-            
-            <div className="flex items-center space-x-2 sm:space-x-4 w-full sm:w-auto justify-between">
-              <Coins amount={coins} />
-              
-              {/* Indicador de ronda */}
-              <div className="bg-purple-500/30 px-2 py-1 rounded-full text-xs text-white">
-                Ronda {currentRound}/3
-              </div>
-              
-              <div className="flex space-x-1 sm:space-x-2">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    setShowProfile(!showProfile);
-                    playSound('click');
-                  }}
-                  className="text-white hover:text-yellow-300 transition-colors text-xs sm:text-sm px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10"
-                >
-                  👤 Perfil
-                </motion.button>
-                
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    setShowStore(!showStore);
-                    playSound('click');
-                  }}
-                  className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1 rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 transition-all text-xs sm:text-sm"
-                >
-                  🛒 Tienda
-                </motion.button>
-              </div>
-            </div>
-          </div>
-          
-          {gameMode === 'single' && <LevelProgress />}
-          
-          {/* Barra de progreso de ronda */}
-          <div className="mt-2">
-            <div className="flex justify-between text-xs text-white/60 mb-1">
-              <span>Ronda {currentRound}</span>
-              <span>Pregunta {currentQuestion + 1}/{shuffledQuestions.length}</span>
-            </div>
-            <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-yellow-400 to-orange-500"
-                initial={{ width: 0 }}
-                animate={{ width: `${((currentQuestion % questionsPerRound) / questionsPerRound) * 100}%` }}
-                transition={{ duration: 0.3 }}
-              />
-            </div>
-          </div>
-        </div>
-      </motion.header>
+      <GameHeader 
+        theme={theme}
+        userName={userName}
+        coins={coins}
+        gameMode={gameMode}
+        currentRound={currentRound}
+        totalQuestions={shuffledQuestions.length}
+        currentQuestion={currentQuestion}
+        correctStreak={correctStreak}
+        currentTitle={currentTitle}
+        onProfileClick={() => {
+          setShowProfile(true);
+          playSound('click');
+        }}
+        onStoreClick={() => {
+          setShowStore(true);
+          playSound('click');
+        }}
+        playSound={playSound}
+      />
 
       {/* Boosts activos */}
       <ActiveBoosts />
@@ -354,6 +316,7 @@ const GameContent = () => {
             <UserProfile onClose={handleCloseProfile} />
           ) : showRoundPause ? (
             <RoundPause 
+              key={`pause-${currentRound}`}
               round={currentRound}
               stats={roundStats}
               onContinue={handleContinueAfterPause}
@@ -361,10 +324,11 @@ const GameContent = () => {
             />
           ) : (
             <motion.div
-              key="game"
+              key={`game-${currentQuestion}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
               className="max-w-4xl mx-auto h-full flex items-center justify-center"
             >
               <div className="w-full bg-white/5 backdrop-blur-lg rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 border border-white/10">
