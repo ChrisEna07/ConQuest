@@ -13,7 +13,7 @@ import BoostsPanel from './components/Game/BoostsPanel';
 import MultiplayerScores from './components/Game/MultiplayerScores';
 import RoundPause from './components/Game/RoundPause';
 import GameHeader from './components/Game/GameHeader';
-import { generateGameQuestions, getQuestionStats, resetQuestionHistory } from './utils/QuestionManager';
+import { generateGameQuestions, getQuestionStats } from './utils/QuestionManager';
 
 const GameContent = () => {
   const { 
@@ -47,21 +47,18 @@ const GameContent = () => {
   });
   const [roundCorrectAnswers, setRoundCorrectAnswers] = useState(0);
   const [roundWrongAnswers, setRoundWrongAnswers] = useState(0);
-  const [nextRoundReady, setNextRoundReady] = useState(false);
+  const [pauseTriggered, setPauseTriggered] = useState(false);
   
   const theme = themes[currentTheme] || themes.default;
 
   // Función para generar preguntas usando QuestionManager
   const loadQuestions = useCallback(() => {
     try {
-      const questions = generateGameQuestions(30); // Genera 30 preguntas únicas
+      const questions = generateGameQuestions(30);
       setGameQuestions(questions);
-      
-      // Mostrar estadísticas en consola
       const stats = getQuestionStats();
       console.log('📊 Estadísticas de preguntas:', stats);
       console.log(`📚 Generadas ${questions.length} preguntas únicas para esta sesión`);
-      
       return questions;
     } catch (error) {
       console.error('Error al cargar preguntas:', error);
@@ -69,13 +66,7 @@ const GameContent = () => {
     }
   }, []);
 
-  // Función para resetear el historial de preguntas
-  const handleResetQuestionHistory = useCallback(() => {
-    resetQuestionHistory();
-    addToast('🔄 Historial de preguntas reseteado', 'info', 3000);
-  }, [addToast]);
-
-  // Mezclar preguntas al iniciar el juego
+  // Inicializar juego
   useEffect(() => {
     if (gameState === 'playing') {
       const questions = loadQuestions();
@@ -86,7 +77,7 @@ const GameContent = () => {
       setShowRoundPause(false);
       setRoundCorrectAnswers(0);
       setRoundWrongAnswers(0);
-      setNextRoundReady(false);
+      setPauseTriggered(false);
       
       console.log(`🎮 Iniciando juego con ${questions.length} preguntas`);
     }
@@ -110,30 +101,44 @@ const GameContent = () => {
       return;
     }
 
+    // Verificar si hemos completado una ronda (10 preguntas)
+    // y no es la última pregunta
     const isRoundComplete = currentQuestion > 0 && 
-                           currentQuestion % questionsPerRound === 0;
+                           currentQuestion % questionsPerRound === 0 &&
+                           currentQuestion < gameQuestions.length;
 
-    if (isRoundComplete && !nextRoundReady) {
+    if (isRoundComplete && !pauseTriggered) {
       console.log(`🏁 Ronda ${currentRound} completada en pregunta ${currentQuestion}`);
-      setNextRoundReady(true);
+      setPauseTriggered(true);
       setShowRoundPause(true);
       addToast(`🏁 ¡Ronda ${currentRound} completada!`, 'info', 3000);
       playSound('levelup');
     }
-  }, [currentQuestion, gameState, gameFinished, showRoundPause, gameQuestions.length, currentRound, questionsPerRound, nextRoundReady, playSound, addToast]);
+  }, [currentQuestion, gameState, gameFinished, showRoundPause, gameQuestions.length, currentRound, questionsPerRound, pauseTriggered, playSound, addToast]);
 
-  // Manejar continuación después de la pausa
+  // Manejar continuación después de la pausa - CORREGIDO
   const handleContinueAfterPause = useCallback(() => {
-    console.log(`▶️ Continuando a ronda ${currentRound + 1}`);
+    // La pregunta actual es el múltiplo (10, 20, etc.)
+    // Necesitamos avanzar a la siguiente pregunta manualmente
+    const nextQuestionIndex = currentQuestion; // Mantener el mismo índice por ahora
     
+    console.log(`▶️ Continuando desde pregunta ${nextQuestionIndex} a ronda ${currentRound + 1}`);
+    
+    // Incrementar la ronda
     setCurrentRound(prev => prev + 1);
+    
+    // Resetear estados de pausa
     setShowRoundPause(false);
-    setNextRoundReady(false);
+    setPauseTriggered(false);
     setRoundCorrectAnswers(0);
     setRoundWrongAnswers(0);
     
+    // IMPORTANTE: No cambiar currentQuestion aquí, 
+    // ya está en el valor correcto (10, 20, etc.)
+    // La siguiente pregunta se cargará naturalmente
+    
     playSound('click');
-  }, [playSound]);
+  }, [currentQuestion, playSound]);
 
   // Ir a la tienda desde la pausa
   const handleGoToStore = useCallback(() => {
@@ -227,6 +232,7 @@ const GameContent = () => {
         }
       }
       
+      // Avanzar a la siguiente pregunta si no es la última
       if (currentQuestion < gameQuestions.length - 1) {
         setTimeout(() => {
           setCurrentQuestion(prev => prev + 1);
@@ -237,6 +243,7 @@ const GameContent = () => {
           }
         }, 1500);
       } else {
+        // Fin del juego
         setGameFinished(true);
         
         setTimeout(() => {
@@ -266,10 +273,7 @@ const GameContent = () => {
   const handleCloseStore = useCallback(() => {
     setShowStore(false);
     playSound('click');
-    if (nextRoundReady) {
-      setShowRoundPause(true);
-    }
-  }, [playSound, nextRoundReady]);
+  }, [playSound]);
 
   const handleCloseProfile = useCallback(() => {
     setShowProfile(false);
