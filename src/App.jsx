@@ -13,6 +13,7 @@ import BoostsPanel from './components/Game/BoostsPanel';
 import MultiplayerScores from './components/Game/MultiplayerScores';
 import RoundPause from './components/Game/RoundPause';
 import GameHeader from './components/Game/GameHeader';
+import DeveloperCredit from './components/UI/DeveloperCredit';
 import { generateGameQuestions, getQuestionStats } from './utils/QuestionManager';
 
 const GameContent = () => {
@@ -97,20 +98,16 @@ const GameContent = () => {
     }
   }, [showRoundPause, roundCorrectAnswers, roundWrongAnswers]);
 
-  // Verificar si es momento de pausa entre rondas - CORREGIDO
+  // Verificar si es momento de pausa entre rondas
   useEffect(() => {
-    // Solo verificar si estamos jugando, no en pausa, no terminado, y hay preguntas
     if (gameState !== 'playing' || gameFinished || showRoundPause || gameQuestions.length === 0) {
       return;
     }
 
-    // Verificar si hemos completado una ronda (10 preguntas)
-    // y no es la última pregunta
     const isRoundComplete = currentQuestion > 0 && 
                            currentQuestion % questionsPerRound === 0 &&
                            currentQuestion < gameQuestions.length;
 
-    // Importante: Solo activar si es una ronda diferente a la última pausa
     if (isRoundComplete && lastPauseRound !== currentRound) {
       console.log(`🏁 Ronda ${currentRound} completada en pregunta ${currentQuestion}`);
       setLastPauseRound(currentRound);
@@ -121,20 +118,14 @@ const GameContent = () => {
     }
   }, [currentQuestion, gameState, gameFinished, showRoundPause, gameQuestions.length, currentRound, questionsPerRound, lastPauseRound, playSound, addToast]);
 
-  // Manejar continuación después de la pausa - CORREGIDO
+  // Manejar continuación después de la pausa
   const handleContinueAfterPause = useCallback(() => {
-    // Calcular la siguiente pregunta (actual + 1)
     const nextQuestionIndex = currentQuestion + 1;
     
     console.log(`▶️ Continuando a ronda ${currentRound + 1}, siguiente pregunta: ${nextQuestionIndex}`);
     
-    // Incrementar la ronda
     setCurrentRound(prev => prev + 1);
-    
-    // Avanzar a la siguiente pregunta
     setCurrentQuestion(nextQuestionIndex);
-    
-    // Resetear estados de pausa
     setShowRoundPause(false);
     setPauseTriggered(false);
     setRoundCorrectAnswers(0);
@@ -235,7 +226,6 @@ const GameContent = () => {
         }
       }
       
-      // Avanzar a la siguiente pregunta si no es la última
       if (currentQuestion < gameQuestions.length - 1) {
         setTimeout(() => {
           setCurrentQuestion(prev => prev + 1);
@@ -246,7 +236,6 @@ const GameContent = () => {
           }
         }, 1500);
       } else {
-        // Fin del juego
         setGameFinished(true);
         
         setTimeout(() => {
@@ -283,7 +272,6 @@ const GameContent = () => {
     playSound('click');
   }, [playSound]);
 
-  // Renderizado condicional
   if (gameState === 'landing') {
     return <LandingPage onStart={handleLandingStart} />;
   }
@@ -383,6 +371,9 @@ const GameContent = () => {
         </AnimatePresence>
       </main>
 
+      {/* Crédito del desarrollador */}
+      <DeveloperCredit />
+      
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
