@@ -12,13 +12,20 @@ const GameHeader = ({
   currentRound, 
   totalQuestions, 
   currentQuestion,
+  correctStreak,
+  currentTitle,
   onProfileClick, 
   onStoreClick,
   playSound 
 }) => {
   
-  // Calcular progreso de la ronda actual
-  const roundProgress = ((currentQuestion % 10) / 10) * 100;
+  // Calcular progreso de la ronda actual (0-100)
+  const questionsPerRound = 10;
+  const questionInRound = currentQuestion % questionsPerRound;
+  const roundProgress = totalQuestions > 0 ? ((questionInRound) / questionsPerRound) * 100 : 0;
+  
+  // Calcular rondas totales (máximo 3)
+  const totalRounds = Math.ceil(totalQuestions / questionsPerRound);
 
   return (
     <motion.header 
@@ -54,7 +61,7 @@ const GameHeader = ({
             
             {/* Indicador de ronda */}
             <div className="hidden sm:block bg-purple-500/30 px-3 py-1 rounded-full text-xs text-white">
-              Ronda {currentRound}/3
+              Ronda {currentRound}/{totalRounds}
             </div>
             
             <div className="flex space-x-1 sm:space-x-2">
@@ -96,7 +103,7 @@ const GameHeader = ({
         <div className="mt-2">
           <div className="flex justify-between text-xs text-white/60 mb-1">
             <span>Ronda {currentRound}</span>
-            <span>Pregunta {currentQuestion + 1}/{totalQuestions}</span>
+            <span>Pregunta {questionInRound + 1}/{questionsPerRound}</span>
           </div>
           <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
             <motion.div
@@ -108,11 +115,15 @@ const GameHeader = ({
           </div>
         </div>
 
-        {/* Indicadores de racha (opcional) */}
+        {/* Indicadores de racha y título */}
         {gameMode === 'single' && (
-          <div className="flex justify-end mt-1 space-x-2">
-            <span className="text-xs text-yellow-400">🔥 Racha: 0</span>
-            <span className="text-xs text-purple-400">🏆 Título: Novato</span>
+          <div className="flex justify-end mt-1 space-x-3">
+            <span className="text-xs text-yellow-400 flex items-center gap-1">
+              <span>🔥</span> {correctStreak}
+            </span>
+            <span className="text-xs text-purple-400 flex items-center gap-1">
+              <span>🏆</span> {currentTitle}
+            </span>
           </div>
         )}
       </div>

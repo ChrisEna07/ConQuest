@@ -46,7 +46,8 @@ const GameContent = () => {
     roundScore: 0
   });
   const [pauseTriggered, setPauseTriggered] = useState(false);
-  const [answeredQuestions, setAnsweredQuestions] = useState(0);
+  const [roundCorrectAnswers, setRoundCorrectAnswers] = useState(0);
+  const [roundWrongAnswers, setRoundWrongAnswers] = useState(0);
   
   const theme = themes[currentTheme] || themes.default;
 
@@ -67,28 +68,27 @@ const GameContent = () => {
       setScore(0);
       setPauseTriggered(false);
       setShowRoundPause(false);
-      setAnsweredQuestions(0);
+      setRoundCorrectAnswers(0);
+      setRoundWrongAnswers(0);
     }
   }, [gameState, loadQuestions]);
 
-  // Calcular estadísticas de la ronda basadas en respuestas reales
-  useEffect(() => {
-    if (showRoundPause) {
-      // Aquí deberías calcular las estadísticas reales basadas en las respuestas de la ronda
-      // Por ahora usamos valores de ejemplo
-      const roundCorrect = Math.floor(Math.random() * 5) + 5; // Entre 5-9 correctas
-      const roundIncorrect = questionsPerRound - roundCorrect;
-      const roundCoins = roundCorrect * 20;
-      const roundScore = roundCorrect * 100;
-      
-      setRoundStats({
-        correct: roundCorrect,
-        incorrect: roundIncorrect,
-        coinsEarned: roundCoins,
-        roundScore: roundScore
-      });
-    }
-  }, [showRoundPause, questionsPerRound]);
+  // Calcular estadísticas de la ronda
+  const calculateRoundStats = useCallback(() => {
+    // Aquí deberías calcular con datos reales
+    // Por ahora usamos los acumulados de la ronda
+    const roundCorrect = roundCorrectAnswers;
+    const roundIncorrect = roundWrongAnswers;
+    const roundCoins = roundCorrect * 20;
+    const roundScore = roundCorrect * 100;
+    
+    setRoundStats({
+      correct: roundCorrect,
+      incorrect: roundIncorrect,
+      coinsEarned: roundCoins,
+      roundScore: roundScore
+    });
+  }, [roundCorrectAnswers, roundWrongAnswers]);
 
   // Verificar si es momento de pausa entre rondas
   useEffect(() => {
@@ -96,25 +96,27 @@ const GameContent = () => {
       return;
     }
 
-    // Verificar si hemos respondido todas las preguntas de la ronda actual
-    const questionsAnsweredInRound = currentQuestion;
-    const isRoundComplete = questionsAnsweredInRound > 0 && 
-                           questionsAnsweredInRound % questionsPerRound === 0 && 
-                           questionsAnsweredInRound < shuffledQuestions.length;
+    // Verificar si hemos completado una ronda (10 preguntas)
+    const isRoundComplete = currentQuestion > 0 && 
+                           currentQuestion % questionsPerRound === 0 && 
+                           currentQuestion < shuffledQuestions.length;
 
     if (isRoundComplete && !pauseTriggered) {
       setPauseTriggered(true);
+      calculateRoundStats();
       setShowRoundPause(true);
       addToast(`🏁 ¡Ronda ${currentRound} completada!`, 'info', 3000);
       playSound('levelup');
     }
-  }, [currentQuestion, gameState, gameFinished, showRoundPause, shuffledQuestions.length, currentRound, questionsPerRound, pauseTriggered, playSound, addToast]);
+  }, [currentQuestion, gameState, gameFinished, showRoundPause, shuffledQuestions.length, currentRound, questionsPerRound, pauseTriggered, calculateRoundStats, playSound, addToast]);
 
   // Manejar continuación después de la pausa
   const handleContinueAfterPause = useCallback(() => {
     setShowRoundPause(false);
     setPauseTriggered(false);
-    // No incrementamos currentRound aquí, se incrementa cuando realmente avanzamos
+    // Resetear contadores de la ronda
+    setRoundCorrectAnswers(0);
+    setRoundWrongAnswers(0);
     playSound('click');
   }, [playSound]);
 
@@ -197,59 +199,63 @@ const GameContent = () => {
         setTotalCorrectAnswers(newTotalCorrect);
         checkAndUpdateTitle(newTotalCorrect);
         
+        // Actualizar contadores de la ronda
+        setRoundCorrectAnswers(prev => prev + 1);
+        
         playSound('correct');
       } else {
         handleWrongAnswer();
         playSound('wrong');
+        
+        // Actualizar contadores de la ronda
+        setRoundWrongAnswers(prev => prev + 1);
         
         if (gameMode === 'multi') {
           addToast(`❌ ¡${players[currentPlayer]?.name} falló!`, 'error', 2000);
         }
       }
       
-      // Avanzar a la siguiente pregunta SOLO si no estamos en pausa
-      if (!showRoundPause) {
-        if (currentQuestion < shuffledQuestions.length - 1) {
-          setTimeout(() => {
-            setCurrentQuestion(prev => {
-              const nextQuestion = prev + 1;
-              // Incrementar la ronda si es necesario
-              if (nextQuestion % questionsPerRound === 0 && nextQuestion < shuffledQuestions.length) {
-                setCurrentRound(prevRound => prevRound + 1);
-              }
-              return nextQuestion;
-            });
-            setSelectedAnswer(null);
-            
-            if (gameMode === 'multi') {
-              nextPlayer();
+      // Avanzar a la siguiente pregunta
+      if (currentQuestion < shuffledQuestions.length - 1) {
+        setTimeout(() => {
+          setCurrentQuestion(prev => {
+            const nextQuestion = prev + 1;
+            // Incrementar la ronda si es necesario
+            if (nextQuestion % questionsPerRound === 0) {
+              setCurrentRound(prevRound => prevRound + 1);
             }
-          }, 1500);
-        } else {
-          // Fin del juego
-          setGameFinished(true);
+            return nextQuestion;
+          });
+          setSelectedAnswer(null);
+          
+          if (gameMode === 'multi') {
+            nextPlayer();
+          }
+        }, 1500);
+      } else {
+        // Fin del juego
+        setGameFinished(true);
+        
+        setTimeout(() => {
+          setCurrentQuestion(0);
+          setSelectedAnswer(null);
+          setScore(0);
+          setGameFinished(false);
+          
+          if (gameMode === 'multi') {
+            const winner = Object.entries(scores).reduce((a, b) => 
+              (scores[a[0]] > scores[b[0]] ? a : b)
+            );
+            addToast(`🏆 ¡Ganador: ${players[winner[0]]?.name} con ${winner[1]} puntos!`, 'success', 4000);
+          } else {
+            addToast(`🎮 ¡Juego completado! Puntuación final: ${score}`, 'success', 4000);
+          }
           
           setTimeout(() => {
-            setCurrentQuestion(0);
-            setSelectedAnswer(null);
-            setScore(0);
-            setGameFinished(false);
-            
-            if (gameMode === 'multi') {
-              const winner = Object.entries(scores).reduce((a, b) => 
-                (scores[a[0]] > scores[b[0]] ? a : b)
-              );
-              addToast(`🏆 ¡Ganador: ${players[winner[0]]?.name} con ${winner[1]} puntos!`, 'success', 4000);
-            } else {
-              addToast(`🎮 ¡Juego completado! Puntuación final: ${score}`, 'success', 4000);
-            }
-            
-            setTimeout(() => {
-              setGameState('playerSelect');
-              resetMultiplayer();
-            }, 3000);
-          }, 2000);
-        }
+            setGameState('playerSelect');
+            resetMultiplayer();
+          }, 3000);
+        }, 2000);
       }
     }, 1000);
   }, [selectedAnswer, showRoundPause, playSound, shuffledQuestions, currentQuestion, boosts.doublePoints.active, gameMode, addPlayerScore, currentPlayer, players, addCoins, addExperience, handleCorrectAnswer, totalCorrectAnswers, checkAndUpdateTitle, handleWrongAnswer, questionsPerRound, scores, score, resetMultiplayer, addToast, nextPlayer]);
