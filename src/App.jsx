@@ -75,33 +75,28 @@ const GameContent = () => {
 
   // Calcular estadísticas de la ronda
   const calculateRoundStats = useCallback(() => {
-    // Aquí deberías calcular con datos reales
-    // Por ahora usamos los acumulados de la ronda
-    const roundCorrect = roundCorrectAnswers;
-    const roundIncorrect = roundWrongAnswers;
-    const roundCoins = roundCorrect * 20;
-    const roundScore = roundCorrect * 100;
-    
     setRoundStats({
-      correct: roundCorrect,
-      incorrect: roundIncorrect,
-      coinsEarned: roundCoins,
-      roundScore: roundScore
+      correct: roundCorrectAnswers,
+      incorrect: roundWrongAnswers,
+      coinsEarned: roundCorrectAnswers * 20,
+      roundScore: roundCorrectAnswers * 100
     });
   }, [roundCorrectAnswers, roundWrongAnswers]);
 
   // Verificar si es momento de pausa entre rondas
   useEffect(() => {
-    if (gameState !== 'playing' || gameFinished || showRoundPause || !shuffledQuestions.length) {
+    // Solo verificar si estamos jugando, no en pausa, no terminado, y hay preguntas
+    if (gameState !== 'playing' || gameFinished || showRoundPause || shuffledQuestions.length === 0) {
       return;
     }
 
-    // Verificar si hemos completado una ronda (10 preguntas)
+    // Verificar si hemos completado una ronda (10 preguntas) y no es la última pregunta
     const isRoundComplete = currentQuestion > 0 && 
                            currentQuestion % questionsPerRound === 0 && 
                            currentQuestion < shuffledQuestions.length;
 
     if (isRoundComplete && !pauseTriggered) {
+      console.log(`🏁 Ronda ${currentRound} completada en pregunta ${currentQuestion}`);
       setPauseTriggered(true);
       calculateRoundStats();
       setShowRoundPause(true);
@@ -112,13 +107,15 @@ const GameContent = () => {
 
   // Manejar continuación después de la pausa
   const handleContinueAfterPause = useCallback(() => {
+    console.log(`▶️ Continuando a la siguiente ronda desde ronda ${currentRound}`);
     setShowRoundPause(false);
     setPauseTriggered(false);
-    // Resetear contadores de la ronda
     setRoundCorrectAnswers(0);
     setRoundWrongAnswers(0);
     playSound('click');
-  }, [playSound]);
+    // Importante: NO incrementamos currentRound aquí, se incrementará naturalmente
+    // cuando se respondan las preguntas de la siguiente ronda
+  }, [playSound, currentRound]);
 
   // Ir a la tienda desde la pausa
   const handleGoToStore = useCallback(() => {
@@ -218,14 +215,21 @@ const GameContent = () => {
       // Avanzar a la siguiente pregunta
       if (currentQuestion < shuffledQuestions.length - 1) {
         setTimeout(() => {
-          setCurrentQuestion(prev => {
-            const nextQuestion = prev + 1;
-            // Incrementar la ronda si es necesario
-            if (nextQuestion % questionsPerRound === 0) {
-              setCurrentRound(prevRound => prevRound + 1);
-            }
-            return nextQuestion;
-          });
+          const nextQuestion = currentQuestion + 1;
+          
+          // Verificar si vamos a empezar una nueva ronda
+          const isNewRound = nextQuestion % questionsPerRound === 0;
+          
+          setCurrentQuestion(nextQuestion);
+          
+          // Solo incrementamos la ronda si es una nueva ronda Y no es la última pregunta
+          if (isNewRound && nextQuestion < shuffledQuestions.length) {
+            setCurrentRound(prev => {
+              console.log(`🔄 Incrementando ronda de ${prev} a ${prev + 1}`);
+              return prev + 1;
+            });
+          }
+          
           setSelectedAnswer(null);
           
           if (gameMode === 'multi') {
