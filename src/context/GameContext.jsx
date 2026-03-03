@@ -107,12 +107,12 @@ export const GameProvider = ({ children }) => {
     title: useRef(null)
   };
 
-  // Inicializar sonidos con manejo de errores - USANDO CARPETA PUBLIC
+  // Inicializar sonidos con manejo de errores mejorado
   useEffect(() => {
-    // Crear audio elements con manejo de errores
-    Object.keys(sounds).forEach(key => {
+    const soundFiles = ['correct', 'wrong', 'coin', 'levelup', 'click', 'landing', 'title'];
+    
+    soundFiles.forEach(key => {
       try {
-        // Usar la ruta de la carpeta public
         const audioPath = `/sounds/${key}.mp3`;
         console.log(`Cargando sonido: ${audioPath}`);
         
@@ -121,29 +121,40 @@ export const GameProvider = ({ children }) => {
         
         // Manejar errores de carga
         audio.onerror = () => {
-          console.log(`⚠️ No se pudo cargar el sonido: ${key} - Verifica que el archivo exista en public/sounds/`);
+          console.log(`⚠️ No se pudo cargar el sonido: ${key} - Continuando sin sonido`);
+          // Establecer el ref como null para evitar intentos de reproducción
+          sounds[key].current = null;
+        };
+        
+        // Cuando el audio esté listo
+        audio.oncanplaythrough = () => {
+          console.log(`✅ Sonido ${key} cargado correctamente`);
+          sounds[key].current = audio;
         };
         
         // Precargar el audio
         audio.load();
-        
-        sounds[key].current = audio;
       } catch (error) {
         console.log(`❌ Error al crear audio para ${key}:`, error);
+        sounds[key].current = null;
       }
     });
 
     // Configurar loop para landing si existe
-    if (sounds.landing.current) {
-      sounds.landing.current.loop = true;
-    }
+    const checkLandingSound = setInterval(() => {
+      if (sounds.landing.current) {
+        sounds.landing.current.loop = true;
+        clearInterval(checkLandingSound);
+      }
+    }, 100);
 
     // Limpiar al desmontar
     return () => {
+      clearInterval(checkLandingSound);
       Object.values(sounds).forEach(sound => {
         if (sound.current) {
           sound.current.pause();
-          sound.current.src = ''; // Liberar recursos
+          sound.current.src = '';
           sound.current = null;
         }
       });
@@ -155,25 +166,25 @@ export const GameProvider = ({ children }) => {
     if (!soundEnabled) return;
     
     const sound = sounds[soundName]?.current;
-    if (sound) {
-      // Verificar que el audio esté cargado
-      if (sound.readyState >= 2) { // HAVE_CURRENT_DATA o superior
-        sound.currentTime = 0;
-        sound.play().catch(e => {
-          // Ignorar error de interacción del usuario
-          if (e.name !== 'NotAllowedError') {
-            console.log(`Error reproduciendo sonido ${soundName}:`, e);
-          }
-        });
-      } else {
-        // Si no está cargado, intentar reproducir de todas formas
-        sound.play().catch(e => {
-          // Silenciar todos los errores de sonido para no molestar al usuario
+    if (!sound) {
+      // Silenciosamente ignorar si el sonido no está disponible
+      return;
+    }
+    
+    try {
+      sound.currentTime = 0;
+      const playPromise = sound.play();
+      
+      if (playPromise !== undefined) {
+        playPromise.catch(e => {
+          // Ignorar errores de interacción del usuario
           if (e.name !== 'NotAllowedError' && e.name !== 'NotSupportedError') {
             console.log(`Error reproduciendo sonido ${soundName}:`, e);
           }
         });
       }
+    } catch (e) {
+      // Error silencioso
     }
   };
 
@@ -310,8 +321,14 @@ export const GameProvider = ({ children }) => {
     }
   };
 
-  // Funciones para toasts con duración personalizable
+  // Funciones para toasts con control de duplicados
   const addToast = (message, type = 'success', duration = 3000) => {
+    // Evitar toasts duplicados del mismo mensaje en menos de 2 segundos
+    const lastToast = toasts[toasts.length - 1];
+    if (lastToast && lastToast.message === message && Date.now() - lastToast.id < 2000) {
+      return lastToast.id;
+    }
+    
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, type, duration }]);
     return id;
@@ -320,6 +337,17 @@ export const GameProvider = ({ children }) => {
   const removeToast = (id) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
+
+  // Limpiar toasts automáticamente (solo como respaldo)
+  useEffect(() => {
+    const timers = toasts.map(toast => {
+      return setTimeout(() => {
+        removeToast(toast.id);
+      }, toast.duration || 3000);
+    });
+
+    return () => timers.forEach(timer => clearTimeout(timer));
+  }, [toasts]);
 
   // Funciones de boosts
   const useBoost = (boostType) => {
